@@ -1,0 +1,14 @@
+=== Braille Translation Export ===
+Session ID: session-uuid-default
+Plain Text Source: Sunny mountain landscape.
+
+Grade 1 Braille:
+Sunny mountain landscape.
+
+Grade 2 Braille:
+Sunny mountain landscape.
+
+Unicode Braille:
+⠠⠎⠥⠝⠝⠽ ⠍⠕⠥⠝⠞⠁⠊⠝ ⠇⠁⠝⠙⠎⠉⠁⠏⠑⠲
+
+Translation Notes: UEB Grade 1 applied.

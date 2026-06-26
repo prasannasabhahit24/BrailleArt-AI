@@ -12,9 +12,13 @@ Responsible for:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# TODO: Import router and db setup
-# from .router import api_router
-# from ..database.db import engine, Base
+# Import router and db setup
+from .router import api_router
+from ..database.db import engine, Base
+from ..database import models
+
+# Create tables at startup
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="BrailleArt AI Backend",
@@ -31,8 +35,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# TODO: Mount routers
-# app.include_router(api_router, prefix="/api/v1")
+# Mount routers
+app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/health", tags=["health"])
 def health_check():

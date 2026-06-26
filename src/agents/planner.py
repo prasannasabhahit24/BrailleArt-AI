@@ -66,17 +66,17 @@ class PlannerAgent:
             "- art_knowledge: Identifies artists, historical context, symbolism, similar works.\n"
             "- accessibility: Generates screen-reader scripts, child descriptions, alt text, Easy English.\n"
             "- evaluation: Audits visual-to-tactile alignment and outputs grading metrics.\n"
-            "- braille: Translates text labels to Unified English Braille (UEB) symbols.\n"
-            "- tactile: Maps 2D pixel grids/matrices into actual Unicode Braille characters.\n"
+            "- braille: Translates accessibility agent outputs into Grade 1, Grade 2, and Unicode Braille representations.\n"
+            "- tactile: Generates simplified SVG outlines, raised-line layouts, boundary maps, relative spatial positions, and embosser-ready SVGs based on prior agent signals.\n"
             "- learning: Customizes grading level or explanation vocabulary.\n"
             "- reflection: Critiques intermediate drafts to remove dot overcrowding.\n"
             "- explainability: Compiles a report justifying confidence scores and choices.\n"
             "- conversation: Manages normal dialogue flow or conversational feedback.\n\n"
             "Rules:\n"
-            "1. If an image is uploaded, you MUST include 'security', 'vision', 'style', 'tactile', and 'accessibility'.\n"
+            "1. If an image is uploaded, you MUST include 'security', 'vision', 'style', 'tactile', 'accessibility', and 'braille'.\n"
             "2. If the user asks about an artwork's meaning, artist, or history, include 'art_knowledge'.\n"
-            "3. If text translation or diagram labels are mentioned, include 'braille' and possibly 'ocr'.\n"
-            "4. Order the execution list logically (e.g. security -> learning/profile checks -> visual analysis -> style/emotion adjustments -> mapping -> accessibility/explainability audits).\n"
+            "3. Include 'braille' to convert accessibility outputs or text inputs into Braille patterns.\n"
+            "4. Order the execution list logically (e.g. security -> learning/profile checks -> visual analysis -> style/emotion adjustments -> accessibility -> braille -> tactile -> explainability/evaluation audits).\n"
             "5. Skip agents that are completely unrelated to the request."
         )
 
@@ -146,14 +146,13 @@ class PlannerAgent:
         plan = []
         if input_data.has_image:
             # Standard sequence for visual inputs
-            plan = ["security", "learning", "vision", "style", "tactile", "accessibility", "explainability"]
+            plan = ["security", "learning", "vision", "style", "accessibility", "braille", "tactile", "explainability"]
             # Scan query to see if art details are relevant
             lowered_req = input_data.user_request.lower()
             if any(k in lowered_req for k in ["artist", "who painted", "symbolism", "context", "history", "museum"]):
                 plan.insert(4, "art_knowledge")
             if any(k in lowered_req for k in ["text", "ocr", "words", "letters", "label"]):
                 plan.insert(3, "ocr")
-                plan.append("braille")
         else:
             # Text-only translation path
             plan = ["security", "learning", "braille", "conversation", "explainability"]

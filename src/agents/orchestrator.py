@@ -179,14 +179,70 @@ class OrchestratorAgent:
                 error_message=error_msg
             ))
 
-        # Synthesize final output. Prioritize tactile grid, fallback to conversation or translation.
+        # Synthesize final output. Prioritize tactile grid/SVG, fallback to conversation or translation.
         final_out = "No Braille output generated."
-        if context.tactile and "braille_grid" in context.tactile:
-            final_out = context.tactile["braille_grid"]
-        elif context.braille and "translated_braille" in context.braille:
-            final_out = context.braille["translated_braille"]
+        if context.tactile and "simplified_svg" in context.tactile:
+            final_out = context.tactile["simplified_svg"]
+        elif context.braille and "unicode_braille" in context.braille:
+            final_out = context.braille["unicode_braille"]
         elif context.conversation and "response" in context.conversation:
             final_out = context.conversation["response"]
+
+        # Database Logging
+        try:
+            from ..database.db import SessionLocal
+            from ..database.models import AgentConversation, SavedArt
+            
+            db = SessionLocal()
+            try:
+                # Log the conversation / agent execution outcome
+                db_conversation = AgentConversation(
+                    session_id=context.session_id,
+                    user_prompt=context.user_prompt,
+                    agent_response=final_out,
+                    meta_logs={
+                        "trace": [t.model_dump() for t in trace],
+                        "success": pipeline_success,
+                        "braille_metadata": context.braille.get("metadata") if context.braille else None
+                    }
+                )
+                db.add(db_conversation)
+                
+                # Log to SavedArt
+                if context.tactile and context.tactile.get("simplified_svg"):
+                    # Store generated SVG paths and details in database SavedArt entry
+                    db_art = SavedArt(
+                        art_type="image",
+                        source_content=context.user_prompt,
+                        braille_content=context.tactile["simplified_svg"],
+                        config_params={
+                            "simplified_svg_path": context.tactile.get("metadata", {}).get("simplified_svg_path"),
+                            "embosser_ready_svg_path": context.tactile.get("metadata", {}).get("embosser_ready_svg_path"),
+                            "braille_overlay_coordinates": context.tactile.get("braille_overlay_coordinates"),
+                            "object_boundary_map": context.tactile.get("object_boundary_map"),
+                            "relative_spatial_positions": context.tactile.get("relative_spatial_positions"),
+                            "raised_line_layout": context.tactile.get("raised_line_layout")
+                        }
+                    )
+                    db.add(db_art)
+                elif context.braille and context.braille.get("unicode_braille"):
+                    db_art = SavedArt(
+                        art_type="text",
+                        source_content=context.user_prompt,
+                        braille_content=context.braille["unicode_braille"],
+                        config_params={"character_count": context.braille.get("character_count", 0)}
+                    )
+                    db.add(db_art)
+                
+                db.commit()
+                logger.info("Successfully recorded run metrics to database.")
+            except Exception as db_err:
+                db.rollback()
+                logger.error(f"Failed to commit database logs: {db_err}", exc_info=True)
+            finally:
+                db.close()
+        except Exception as import_err:
+            logger.error(f"Database logging initialization failed: {import_err}", exc_info=True)
 
         # Prepare final context dictionary, excluding raw file bytes to save bandwidth in API traces
         context_dump = context.model_dump()
@@ -247,13 +303,13 @@ class OrchestratorAgent:
                 image_bytes=context.raw_image_bytes or b"",
                 focus_areas=context.image_metadata.get("focus_areas", None)
             )
-            out = agent.analyze_image(inp)
+            out = await agent.analyze_image(inp)
             context.vision = out.model_dump()
 
         elif agent_id == "ocr":
             agent = OCRAgent(client=self.safe_client)
             inp = OCRInput(image_bytes=context.raw_image_bytes or b"")
-            out = agent.extract_text(inp)
+            out = await agent.extract_text(inp)
             context.ocr = out.model_dump()
 
         elif agent_id == "style":
@@ -278,7 +334,7 @@ class OrchestratorAgent:
                 user_prompt=context.user_prompt,
                 visual_description=context.vision.get("spatial_layout_description") if context.vision else None
             )
-            out = agent.analyze_emotion(inp)
+            out = await agent.analyze_emotion(inp)
             context.emotion = out.model_dump()
 
         elif agent_id == "art_knowledge":
@@ -287,41 +343,33 @@ class OrchestratorAgent:
                 image_bytes=context.raw_image_bytes,
                 artwork_description=context.user_prompt
             )
-            out = agent.identify_artwork(inp)
+            out = await agent.identify_artwork(inp)
             context.art_knowledge = out.model_dump()
 
         elif agent_id == "tactile":
             agent = TactileAgent(client=self.safe_client)
-            # Create a simple mock grid since tools/braille_tool image convert is not integrated yet
-            w = 80
-            h = 24
-            if context.style and context.style.get("config"):
-                w = context.image_metadata.get("char_width", 80)
             inp = TactileInput(
-                binary_grid=[[0] * w for _ in range(h)],
-                char_width=w,
-                char_height=h
+                vision_output=context.vision,
+                ocr_output=context.ocr,
+                accessibility_output=context.accessibility,
+                braille_output=context.braille,
+                session_id=context.session_id
             )
-            out = agent.generate_tactile_layout(inp)
+            out = await agent.generate_tactile_layout(inp)
             context.tactile = out.model_dump()
 
         elif agent_id == "braille":
             agent = BrailleAgent(client=self.safe_client)
-            # Use OCR text if found, else default to translating the user prompt
-            text = context.user_prompt
-            if context.ocr and context.ocr.get("combined_text"):
-                text = context.ocr["combined_text"]
-            
-            grade = 1
-            if context.learning and context.learning.get("profile"):
-                grade = context.learning["profile"].get("recommended_grade", 1)
-
+            acc_out = context.accessibility or {}
             inp = BrailleInput(
-                source_text=text,
-                braille_grade=grade,
-                uppercase_indicators=True
+                screen_reader_description=acc_out.get("screen_reader_description", ""),
+                easy_english_version=acc_out.get("easy_english_version", ""),
+                child_friendly_version=acc_out.get("child_friendly_version", ""),
+                alt_text=acc_out.get("alt_text", ""),
+                object_list=acc_out.get("object_list", []),
+                session_id=context.session_id
             )
-            out = agent.translate(inp)
+            out = await agent.translate(inp)
             context.braille = out.model_dump()
 
         elif agent_id == "conversation":
@@ -337,7 +385,7 @@ class OrchestratorAgent:
         elif agent_id == "reflection":
             agent = ReflectionAgent(client=self.safe_client)
             inp = ReflectionInput(
-                braille_output=context.tactile.get("braille_grid") if context.tactile else "",
+                braille_output=context.braille.get("unicode_braille") if context.braille else "",
                 source_context=context.user_prompt,
                 iteration=1
             )
@@ -347,11 +395,11 @@ class OrchestratorAgent:
         elif agent_id == "accessibility":
             agent = AccessibilityAgent(client=self.safe_client)
             inp = AccessibilityInput(
-                braille_output=context.tactile.get("braille_grid") if context.tactile else "",
+                braille_output=context.braille.get("unicode_braille") if context.braille else "",
                 text_context=context.user_prompt,
                 has_audio_enabled=True
             )
-            out = agent.generate_accessibility_pack(inp)
+            out = await agent.generate_accessibility_pack(inp)
             context.accessibility = out.model_dump()
 
         elif agent_id == "explainability":
@@ -371,7 +419,7 @@ class OrchestratorAgent:
             inp = ExplainabilityInput(
                 session_id=context.session_id,
                 outcomes=logs,
-                final_braille_output=context.tactile.get("braille_grid") if context.tactile else ""
+                final_braille_output=context.braille.get("unicode_braille") if context.braille else ""
             )
             out = agent.generate_explanation(inp)
             context.explainability = out.model_dump()
@@ -381,7 +429,7 @@ class OrchestratorAgent:
             inp = EvaluationInput(
                 original_image_bytes=context.raw_image_bytes,
                 original_prompt=context.user_prompt,
-                generated_braille=context.tactile.get("braille_grid") if context.tactile else ""
+                generated_braille=context.braille.get("unicode_braille") if context.braille else ""
             )
             out = agent.evaluate_output(inp)
             context.evaluation = out.model_dump()
