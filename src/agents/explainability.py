@@ -49,12 +49,19 @@ class ExplainabilityAgent:
         """
         Initialize the Explainability Agent.
         """
-        self.client = client or genai.Client()
+        self._client = client
         self.system_prompt = (
             "You are the Explainability Agent for BrailleArt AI. Your role is to examine agent "
             "log outputs, interpret confidence scores, and write clear explanations of "
             "the system's reasoning at each pipeline phase."
         )
+
+    @property
+    def client(self) -> genai.Client:
+        """Lazily instantiates the GenAI Client when needed."""
+        if self._client is None:
+            self._client = genai.Client()
+        return self._client
 
     def generate_explanation(self, input_data: ExplainabilityInput) -> ExplainabilityOutput:
         """

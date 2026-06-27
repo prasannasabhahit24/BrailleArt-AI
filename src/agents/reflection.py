@@ -47,12 +47,19 @@ class ReflectionAgent:
         """
         Initialize the Reflection Agent.
         """
-        self.client = client or genai.Client()
+        self._client = client
         self.system_prompt = (
             "You are the Reflection Agent for BrailleArt AI. Your role is to examine the generated "
             "Braille text grid, identify readability challenges, and compute new contrast thresholds "
             "to clean up the layout."
         )
+
+    @property
+    def client(self) -> genai.Client:
+        """Lazily instantiates the GenAI Client when needed."""
+        if self._client is None:
+            self._client = genai.Client()
+        return self._client
 
     def critique_draft(self, input_data: ReflectionInput) -> ReflectionOutput:
         """

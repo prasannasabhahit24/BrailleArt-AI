@@ -47,12 +47,19 @@ class StyleAgent:
         """
         Initialize the Style Agent.
         """
-        self.client = client or genai.Client()
+        self._client = client
         self.system_prompt = (
             "You are the Style Agent for BrailleArt AI. Your role is to determine rendering rules, "
             "dithering thresholds, line widths, and fill properties to balance artistic texture "
             "with tactile legibility."
         )
+
+    @property
+    def client(self) -> genai.Client:
+        """Lazily instantiates the GenAI Client when needed."""
+        if self._client is None:
+            self._client = genai.Client()
+        return self._client
 
     def determine_style(self, input_data: StyleInput) -> StyleOutput:
         """

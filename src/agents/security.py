@@ -45,12 +45,19 @@ class SecurityAgent:
         """
         Initialize the Security Agent.
         """
-        self.client = client or genai.Client()
+        self._client = client
         self.system_prompt = (
             "You are the Security Agent for BrailleArt AI. Your goal is to inspect incoming "
             "data payloads, strip privacy metadata, confirm mime integrity, and guard "
             "against injection attacks or directory traversals in user inputs."
         )
+
+    @property
+    def client(self) -> genai.Client:
+        """Lazily instantiates the GenAI Client when needed."""
+        if self._client is None:
+            self._client = genai.Client()
+        return self._client
 
     def validate_and_sanitize(self, input_data: SecurityInput) -> Tuple[SecurityOutput, Optional[bytes]]:
         """

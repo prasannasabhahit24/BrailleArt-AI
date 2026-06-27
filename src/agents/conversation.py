@@ -46,12 +46,19 @@ class ConversationAgent:
         """
         Initialize the Conversation Agent.
         """
-        self.client = client or genai.Client()
+        self._client = client
         self.system_prompt = (
             "You are the Conversation Agent for BrailleArt AI. Your role is to interact with users, "
             "provide assistance, clarify complex shapes, and extract configuration tweaks "
             "from descriptive chat commands."
         )
+
+    @property
+    def client(self) -> genai.Client:
+        """Lazily instantiates the GenAI Client when needed."""
+        if self._client is None:
+            self._client = genai.Client()
+        return self._client
 
     def process_message(self, input_data: ConversationInput) -> ConversationOutput:
         """

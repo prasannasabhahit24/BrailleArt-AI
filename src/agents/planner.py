@@ -17,14 +17,10 @@ from google.genai import types
 from google.genai.errors import APIError
 from dotenv import load_dotenv
 
+from ..utils.helpers import setup_logger
+
 # Initialize logging
-logger = logging.getLogger("brailleart_ai.planner")
-if not logger.handlers:
-    logger.setLevel(logging.INFO)
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter('[%(asctime)s] %(levelname)s in %(module)s: %(message)s')
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+logger = setup_logger("brailleart_ai.planner")
 
 # Load environment variables
 load_dotenv()

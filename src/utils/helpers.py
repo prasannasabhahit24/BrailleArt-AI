@@ -5,6 +5,7 @@ General utility functions, including logging wrappers, text processing,
 and mathematical transformations needed for coordinate plotting.
 """
 
+import os
 import logging
 import sys
 from typing import Any
@@ -15,7 +16,10 @@ def setup_logger(name: str = "brailleart_ai") -> logging.Logger:
     """
     logger = logging.getLogger(name)
     if not logger.handlers:
-        logger.setLevel(logging.INFO)
+        # Resolve log level dynamically from environment
+        env_level = os.getenv("LOG_LEVEL", "INFO").upper()
+        level = getattr(logging, env_level, logging.INFO)
+        logger.setLevel(level)
         handler = logging.StreamHandler(sys.stdout)
         formatter = logging.Formatter(
             '[%(asctime)s] %(levelname)s in %(module)s: %(message)s'

@@ -46,12 +46,19 @@ class LearningAgent:
         """
         Initialize the Learning Agent.
         """
-        self.client = client or genai.Client()
+        self._client = client
         self.system_prompt = (
             "You are the Learning Agent for BrailleArt AI. Your role is to compute a profile "
             "recommendation to adjust translation grades and narrative complexity to align with "
             "the user's experience and context."
         )
+
+    @property
+    def client(self) -> genai.Client:
+        """Lazily instantiates the GenAI Client when needed."""
+        if self._client is None:
+            self._client = genai.Client()
+        return self._client
 
     def personalize_session(self, input_data: LearningInput) -> LearningOutput:
         """

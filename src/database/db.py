@@ -19,7 +19,7 @@ if DATABASE_URL.startswith("sqlite"):
 engine = create_engine(
     DATABASE_URL,
     connect_args=connect_args,
-    echo=True  # Change to False in production
+    echo=os.getenv("DB_ECHO", "False").lower() in ("true", "1")
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

@@ -36,9 +36,17 @@ WORKDIR /app
 # Copy virtual environment from builder stage
 COPY --from=builder /opt/venv /opt/venv
 
-# Copy source code and files
-COPY .gitignore .env.example README.md requirements.txt ./
+# Copy source code, configurations, launcher
+COPY .gitignore .env.example README.md requirements.txt entrypoint.sh ./
 COPY src/ ./src/
+
+# Ensure launcher script is executable and create non-root user for security
+RUN chmod +x entrypoint.sh && \
+    useradd -u 10001 --create-home appuser && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root security context
+USER appuser
 
 # Expose default ports:
 # 8000: FastAPI Backend
@@ -46,7 +54,5 @@ COPY src/ ./src/
 # 8012: FastMCP Server
 EXPOSE 8000 8501 8012
 
-# Default command runs the backend. This can be overridden at runtime.
-# To run Streamlit: docker run -p 8501:8501 <image> streamlit run src/frontend/app.py
-# To run FastMCP: docker run -p 8012:8012 <image> fastmcp run src/mcp/server.py
-CMD ["uvicorn", "src.backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Use entrypoint script to support multi-role startup configurations
+ENTRYPOINT ["/app/entrypoint.sh"]

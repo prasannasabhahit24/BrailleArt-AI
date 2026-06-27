@@ -47,12 +47,19 @@ class EvaluationAgent:
         """
         Initialize the Evaluation Agent.
         """
-        self.client = client or genai.Client()
+        self._client = client
         self.system_prompt = (
             "You are the Evaluation Agent for BrailleArt AI. Your role is to perform dual-modality "
             "comparisons. You look at both the source (image/text) and the final Braille output, "
             "detecting distortion, aspect ratio warp, or cluttered dot blocks."
         )
+
+    @property
+    def client(self) -> genai.Client:
+        """Lazily instantiates the GenAI Client when needed."""
+        if self._client is None:
+            self._client = genai.Client()
+        return self._client
 
     def evaluate_output(self, input_data: EvaluationInput) -> EvaluationOutput:
         """
